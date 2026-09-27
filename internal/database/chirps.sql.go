@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createChirp = `-- name: CreateChirp :one
+const createChirps = `-- name: CreateChirps :one
 INSERT INTO chirps(id, created_at, updated_at, body, user_id)
 VALUES(
     gen_random_uuid(),
@@ -23,13 +23,13 @@ VALUES(
 RETURNING id, created_at, updated_at, body, user_id
 `
 
-type CreateChirpParams struct {
+type CreateChirpsParams struct {
 	Body   string
 	UserID uuid.UUID
 }
 
-func (q *Queries) CreateChirp(ctx context.Context, arg CreateChirpParams) (Chirp, error) {
-	row := q.db.QueryRowContext(ctx, createChirp, arg.Body, arg.UserID)
+func (q *Queries) CreateChirps(ctx context.Context, arg CreateChirpsParams) (Chirp, error) {
+	row := q.db.QueryRowContext(ctx, createChirps, arg.Body, arg.UserID)
 	var i Chirp
 	err := row.Scan(
 		&i.ID,
