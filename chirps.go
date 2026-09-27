@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/Sudhanshu069/chirpy/internal/database"
 	"github.com/google/uuid"
@@ -46,14 +45,6 @@ func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	type Chirp struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserID    uuid.UUID `json:"user_id"`
-	}
-
 	respondWithJSON(w, http.StatusCreated, Chirp{
 		ID:        chirp.ID,
 		CreatedAt: chirp.CreatedAt,
@@ -65,5 +56,25 @@ func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request)
 }
 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
+	dbChirps, err := cfg.db.GetChirps(r.Context())
+	if err != nil {
+		log.Printf("cannot get list: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps")
+		return
+	}
+
+	chirps := []Chirp{}
+
+	for _, item := range dbChirps {
+		chirps = append(chirps, Chirp{
+			ID:        item.ID,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt,
+			Body:      item.Body,
+			UserID:    item.UserID,
+		})
+	}
+
+	respondWithJSON(w, http.StatusOK, chirps)
 
 }
