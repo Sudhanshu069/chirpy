@@ -59,7 +59,7 @@ func main() {
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir("./")))))
 	mux.HandleFunc("POST /api/chirps", apiCfg.handleCreateChirps)
 	mux.HandleFunc("GET /api/chirps", apiCfg.handleGetChirps)
-	mux.HandleFunc("GET /api/chirps/{chirpID}")
+	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirpsID)
 
 	s := &http.Server{
 		Addr:    ":8080",
