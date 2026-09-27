@@ -1,0 +1,84 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+/bin/
+build/
+dist/
+*.app
+
+# Test binary, built with `go test -c`
+*.test
+
+# Coverage output
+*.out
+coverage.html
+coverage.xml
+coverage/
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Dependency directories
+# Uncomment if you intentionally do not commit vendored dependencies
+# vendor/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# sqlc generated code
+# Uncomment if generated code is rebuilt during CI/development
+# internal/db/
+# db/generated/
+# gen/sqlc/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*~
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# OS-generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Debugging and profiling
+*.prof
+*.pprof
+*.trace
+
+# Air live-reload files
+.air.toml
+tmp/
+
+# Test cache
+.coverprofile
