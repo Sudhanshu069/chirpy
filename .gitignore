@@ -78,9 +78,5 @@ ehthumbs.db
 *.pprof
 *.trace
 
-# Air live-reload files
-.air.toml
-tmp/
-
 # Test cache
 .coverprofile
