@@ -74,11 +74,6 @@ func handleChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(res.Body) > 140 {
-		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
-		return
-	}
-
 	type successResponse struct {
 		Message string `json:"cleaned_body"`
 	}
@@ -88,5 +83,4 @@ func handleChirp(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, successResponse{
 		Message: res.Body,
 	})
-
 }

@@ -47,6 +47,7 @@ func main() {
 	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.adminHitsHandler)
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir("./")))))
+	mux.HandleFunc("POST /api/chirps", apiCfg.handleCreateChirp)
 
 	s := &http.Server{
 		Addr:    ":8080",
