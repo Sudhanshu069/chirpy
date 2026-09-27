@@ -6,6 +6,8 @@
 *.dylib
 
 # Build output
+/chirpy
+/out
 /bin/
 build/
 dist/
