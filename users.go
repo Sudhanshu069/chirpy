@@ -10,7 +10,8 @@ import (
 
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	type payload struct {
-		Body string `json:"email"`
+		Body     string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
