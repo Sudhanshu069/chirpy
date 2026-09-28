@@ -2,37 +2,42 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
-	"time"
+	"strings"
 
-	"github.com/google/uuid"
+	"github.com/Sudhanshu069/chirpy/internal/auth"
+	"github.com/Sudhanshu069/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	type payload struct {
-		Body     string `json:"email"`
+		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
-	res := payload{}
-	err := decoder.Decode(&res)
+	req := payload{}
+	err := decoder.Decode(&req)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 
-	user, err := cfg.db.CreateUser(r.Context(), res.Body)
+	hashedIn, err := auth.HashPassword(req.Password)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create user")
+		log.Print(err)
+		respondWithError(w, http.StatusInternalServerError, "Couldnt create user")
 		return
 	}
 
-	type User struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
+	user, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{
+		Email:          req.Email,
+		HashedPassword: hashedIn,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create user")
+		return
 	}
 
 	respondWithJSON(w, http.StatusCreated, User{
@@ -41,5 +46,68 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
 	})
+
+}
+
+func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
+	type payload struct {
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	req := payload{}
+
+	err := decoder.Decode(&req)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	req.Email = strings.TrimSpace(req.Email)
+
+	if req.Email == "" || req.Password == "" {
+		respondWithError(
+			w,
+			http.StatusBadRequest,
+			"Email and password are required",
+		)
+		return
+	}
+
+	user, err := cfg.db.LoginUser(r.Context(), req.Email)
+	if err != nil {
+		log.Print(err)
+		respondWithError(
+			w,
+			http.StatusUnauthorized,
+			"Incorrect email or password",
+		)
+		return
+	}
+
+	match, err := auth.CheckPasswordHash(req.Password, user.HashedPassword)
+
+	if err != nil {
+		log.Print(err)
+		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
+		return
+	}
+
+	if match {
+		respondWithJSON(w, http.StatusOK, User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		})
+	} else {
+		respondWithError(
+			w,
+			http.StatusUnauthorized,
+			"Incorrect email or password",
+		)
+		return
+	}
 
 }
