@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Sudhanshu069/chirpy/internal/auth"
 	"github.com/Sudhanshu069/chirpy/internal/database"
@@ -51,8 +52,9 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 
 func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 	type payload struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password         string `json:"password"`
+		Email            string `json:"email"`
+		ExpiresInSeconds int    `json:"expires_in_seconds"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -75,6 +77,10 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.ExpiresInSeconds <= 0 || req.ExpiresInSeconds > 3600 {
+		req.ExpiresInSeconds = 3600
+	}
+
 	user, err := cfg.db.LoginUser(r.Context(), req.Email)
 	if err != nil {
 		log.Print(err)
@@ -95,11 +101,22 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if match {
+		token, err := auth.MakeJWT(user.ID, cfg.jwtsecret, time.Second*time.Duration(req.ExpiresInSeconds))
+		if err != nil {
+			log.Print(err)
+			respondWithError(
+				w,
+				http.StatusInternalServerError,
+				"Internal Server Error",
+			)
+			return
+		}
 		respondWithJSON(w, http.StatusOK, User{
 			ID:        user.ID,
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
 			Email:     user.Email,
+			Token:     token,
 		})
 	} else {
 		respondWithError(

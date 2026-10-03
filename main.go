@@ -18,6 +18,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	platform       string
+	jwtsecret      string
 }
 
 type Chirp struct {
@@ -33,6 +34,7 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+	Token     string    `json:"token,omitempty"`
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -52,8 +54,9 @@ func main() {
 	defer db.Close()
 
 	apiCfg := apiConfig{
-		db:       database.New(db),
-		platform: os.Getenv("PLATFORM"),
+		db:        database.New(db),
+		platform:  os.Getenv("PLATFORM"),
+		jwtsecret: os.Getenv("JWT_SECRET"),
 	}
 
 	mux := http.NewServeMux()
