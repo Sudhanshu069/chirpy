@@ -7,14 +7,14 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Sudhanshu069/chirpy/internal/auth"
 	"github.com/Sudhanshu069/chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request) {
 	type payload struct {
-		Body   string `json:"body"`
-		UserID string `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -30,7 +30,9 @@ func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	userID, err := uuid.Parse(req.UserID)
+	tokenString, err := auth.GetBearerToken(r.Header)
+
+	userID, err := auth.ValidateJWT(tokenString, cfg.jwtsecret)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid user ID")
 		return

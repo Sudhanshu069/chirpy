@@ -30,11 +30,12 @@ type Chirp struct {
 }
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token,omitempty"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token,omitempty"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +72,8 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", apiCfg.handleGetChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirpsID)
 	mux.HandleFunc("POST /api/login", apiCfg.handlerLoginUser)
+	mux.HandleFunc("POST /api/refresh", apiCfg.handlerRefresh)
+	mux.HandleFunc("POST /api/revoke")
 
 	s := &http.Server{
 		Addr:    ":8080",
