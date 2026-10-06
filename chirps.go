@@ -6,13 +6,41 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/Sudhanshu069/chirpy/internal/auth"
 	"github.com/Sudhanshu069/chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
-func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request) {
+type Chirp struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
+func cleanProfanity(body string) string {
+	profane := map[string]bool{
+		"kerfuffle": true,
+		"sharbert":  true,
+		"fornax":    true,
+	}
+
+	words := strings.Split(body, " ")
+
+	for i, word := range words {
+		if profane[strings.ToLower(word)] {
+			words[i] = "****"
+		}
+	}
+
+	return strings.Join(words, " ")
+}
+
+func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) {
 	type payload struct {
 		Body string `json:"body"`
 	}
@@ -32,13 +60,13 @@ func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request)
 
 	tokenString, err := auth.GetBearerToken(r.Header)
 
-	userID, err := auth.ValidateJWT(tokenString, cfg.jwtsecret)
+	userID, err := auth.ValidateJWT(tokenString, cfg.jwtSecret)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid user ID")
+		respondWithError(w, http.StatusUnauthorized, "Invalid user ID")
 		return
 	}
 
-	chirp, err := cfg.db.CreateChirps(r.Context(), database.CreateChirpsParams{
+	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   req.Body,
 		UserID: userID,
 	})
@@ -83,15 +111,15 @@ func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (cfg *apiConfig) handleGetChirpsID(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("chirpID")
-	val, err := uuid.Parse(idStr)
+	chirpID, err := uuid.Parse(idStr)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "error parsing the id")
 		return
 	}
 
-	chirp, err := cfg.db.GetChirpsID(r.Context(), val)
+	chirp, err := cfg.db.GetChirp(r.Context(), chirpID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(w, http.StatusNotFound, "Not Found")

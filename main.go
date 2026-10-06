@@ -6,10 +6,8 @@ import (
 	"net/http"
 	"os"
 	"sync/atomic"
-	"time"
 
 	"github.com/Sudhanshu069/chirpy/internal/database"
-	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -18,24 +16,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	platform       string
-	jwtsecret      string
-}
-
-type Chirp struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Body      string    `json:"body"`
-	UserID    uuid.UUID `json:"user_id"`
-}
-
-type User struct {
-	ID           uuid.UUID `json:"id"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Email        string    `json:"email"`
-	Token        string    `json:"token,omitempty"`
-	RefreshToken string    `json:"refresh_token"`
+	jwtSecret      string
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -57,28 +38,39 @@ func main() {
 	apiCfg := apiConfig{
 		db:        database.New(db),
 		platform:  os.Getenv("PLATFORM"),
-		jwtsecret: os.Getenv("JWT_SECRET"),
+		jwtSecret: os.Getenv("JWT_SECRET"),
+	}
+
+	if apiCfg.jwtSecret == "" {
+		log.Fatal("jwt_secret not set")
 	}
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /api/healthz", handleHealth)
-	mux.HandleFunc("POST /api/validate_chirp", handleChirp)
-	mux.HandleFunc("POST /admin/reset", apiCfg.handleReset)
-	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
-	mux.HandleFunc("GET /admin/metrics", apiCfg.adminHitsHandler)
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir("./")))))
-	mux.HandleFunc("POST /api/chirps", apiCfg.handleCreateChirps)
+	mux.HandleFunc("GET /api/healthz", handleHealth)
+
+	mux.HandleFunc("POST /admin/reset", apiCfg.handleReset)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handleMetrics)
+
+	mux.HandleFunc("POST /api/chirps", apiCfg.handleCreateChirp)
 	mux.HandleFunc("GET /api/chirps", apiCfg.handleGetChirps)
-	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirpsID)
-	mux.HandleFunc("POST /api/login", apiCfg.handlerLoginUser)
-	mux.HandleFunc("POST /api/refresh", apiCfg.handlerRefresh)
-	mux.HandleFunc("POST /api/revoke")
+	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirp)
+
+	mux.HandleFunc("POST /api/login", apiCfg.handleLogin)
+	mux.HandleFunc("POST /api/refresh", apiCfg.handleRefresh)
+	mux.HandleFunc("POST /api/revoke", apiCfg.handleRevoke)
+	mux.HandleFunc("POST /api/users", apiCfg.handleCreateUser)
+	mux.HandleFunc("PUT /api/users", apiCfg.handleUpdateUser)
 
 	s := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
 	}
 
-	s.ListenAndServe()
+	err = s.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }

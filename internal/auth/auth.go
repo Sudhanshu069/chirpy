@@ -74,20 +74,20 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 }
 
 func GetBearerToken(headers http.Header) (string, error) {
-	found := headers.Get("Authorization")
-	if found == "" {
+	authHeader := headers.Get("Authorization")
+	if authHeader == "" {
 		return "", errors.New("authorization header not found")
 	}
 
-	firstClean, ok := strings.CutPrefix(found, "Bearer ")
+	token, ok := strings.CutPrefix(authHeader, "Bearer ")
 	if !ok {
 		return "", errors.New("bearer token not found")
 	}
-	val := strings.TrimSpace(firstClean)
-	if val == "" {
+	token = strings.TrimSpace(token)
+	if token == "" {
 		return "", errors.New("empty bearer token")
 	}
-	return val, nil
+	return token, nil
 
 }
 
