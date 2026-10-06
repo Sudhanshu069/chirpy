@@ -68,7 +68,6 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
 	})
-
 }
 
 func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +146,6 @@ func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Token:        accessToken,
 		RefreshToken: refreshToken,
 	})
-
 }
 
 func (cfg *apiConfig) handleRefresh(w http.ResponseWriter, r *http.Request) {
@@ -182,7 +180,6 @@ func (cfg *apiConfig) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, response{
 		Token: accessToken,
 	})
-
 }
 
 func (cfg *apiConfig) handleRevoke(w http.ResponseWriter, r *http.Request) {
@@ -199,7 +196,6 @@ func (cfg *apiConfig) handleRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-
 }
 
 func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -256,5 +252,4 @@ func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: updatedUser.UpdatedAt,
 		Email:     updatedUser.Email,
 	})
-
 }

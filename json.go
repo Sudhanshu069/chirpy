@@ -41,5 +41,4 @@ func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	w.Write(dat)
-
 }
