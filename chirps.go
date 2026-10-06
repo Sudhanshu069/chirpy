@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -45,35 +44,32 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 		Body string `json:"body"`
 	}
 
+	userID, err := auth.UserIDFromRequest(r.Header, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	req := payload{}
-	err := decoder.Decode(&req)
+	err = decoder.Decode(&req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
 	if len(req.Body) > 140 {
-		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
-		return
-	}
-
-	tokenString, err := auth.GetBearerToken(r.Header)
-
-	userID, err := auth.ValidateJWT(tokenString, cfg.jwtSecret)
-	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Invalid user ID")
+		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
 		return
 	}
 
 	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
-		Body:   req.Body,
+		Body:   cleanProfanity(req.Body),
 		UserID: userID,
 	})
 
 	if err != nil {
-		log.Printf("create chirp: %v", err)
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
 		return
 	}
 
@@ -90,8 +86,7 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 	dbChirps, err := cfg.db.GetChirps(r.Context())
 	if err != nil {
-		log.Printf("cannot get list: %v", err)
-		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps", err)
 		return
 	}
 
@@ -115,18 +110,17 @@ func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("chirpID")
 	chirpID, err := uuid.Parse(idStr)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "error parsing the id")
+		respondWithError(w, http.StatusBadRequest, "error parsing the id", err)
 		return
 	}
 
 	chirp, err := cfg.db.GetChirp(r.Context(), chirpID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			respondWithError(w, http.StatusNotFound, "Not Found")
+			respondWithError(w, http.StatusNotFound, "Not Found", err)
 			return
 		}
-		log.Print(err)
-		respondWithError(w, http.StatusInternalServerError, "Internal Server Error")
+		respondWithError(w, http.StatusInternalServerError, "Internal Server Error", err)
 		return
 	}
 

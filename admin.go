@@ -14,7 +14,7 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 
 func (cfg *apiConfig) handleReset(w http.ResponseWriter, r *http.Request) {
 	if cfg.platform != "dev" {
-		respondWithError(w, http.StatusForbidden, "Not Allowed")
+		respondWithError(w, http.StatusForbidden, "Not Allowed", nil)
 		return
 	}
 
@@ -22,7 +22,7 @@ func (cfg *apiConfig) handleReset(w http.ResponseWriter, r *http.Request) {
 
 	err := cfg.db.DeleteAllUsers(r.Context())
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create user")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't reset users", err)
 		return
 	}
 

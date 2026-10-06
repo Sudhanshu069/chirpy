@@ -96,3 +96,11 @@ func MakeRefreshToken() string {
 	rand.Read(key)
 	return hex.EncodeToString(key)
 }
+
+func UserIDFromRequest(headers http.Header, secret string) (uuid.UUID, error) {
+	accessToken, err := GetBearerToken(headers)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return ValidateJWT(accessToken, secret)
+}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -31,7 +30,7 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	req := payload{}
 	err := decoder.Decode(&req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
@@ -42,14 +41,15 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 			w,
 			http.StatusBadRequest,
 			"Email and password are required",
+			nil,
 		)
 		return
 	}
 
 	hashedPassword, err := auth.HashPassword(req.Password)
 	if err != nil {
-		log.Print(err)
-		respondWithError(w, http.StatusInternalServerError, "Couldnt create user")
+
+		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password", err)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		HashedPassword: hashedPassword,
 	})
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create user")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create user", err)
 		return
 	}
 
@@ -82,7 +82,7 @@ func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	err := decoder.Decode(&req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
@@ -93,69 +93,60 @@ func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
 			w,
 			http.StatusBadRequest,
 			"Email and password are required",
+			nil,
 		)
 		return
 	}
 
 	user, err := cfg.db.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		log.Print(err)
 		respondWithError(
 			w,
 			http.StatusUnauthorized,
 			"Incorrect email or password",
+			err,
 		)
 		return
 	}
 
 	match, err := auth.CheckPasswordHash(req.Password, user.HashedPassword)
 
-	if err != nil {
-		log.Print(err)
-		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
+	if err != nil || !match {
+		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
 		return
 	}
 
-	if match {
-		accessToken, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Hour)
-		if err != nil {
-			log.Print(err)
-			respondWithError(
-				w,
-				http.StatusInternalServerError,
-				"Internal Server Error",
-			)
-			return
-		}
-
-		refreshToken := auth.MakeRefreshToken()
-
-		_, err = cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
-			Token:     refreshToken,
-			UserID:    user.ID,
-			ExpiresAt: time.Now().UTC().Add(60 * 24 * time.Hour),
-		})
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "error adding refresh token")
-			return
-		}
-
-		respondWithJSON(w, http.StatusOK, User{
-			ID:           user.ID,
-			CreatedAt:    user.CreatedAt,
-			UpdatedAt:    user.UpdatedAt,
-			Email:        user.Email,
-			Token:        accessToken,
-			RefreshToken: refreshToken,
-		})
-	} else {
+	accessToken, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Hour)
+	if err != nil {
 		respondWithError(
 			w,
-			http.StatusUnauthorized,
-			"Incorrect email or password",
+			http.StatusInternalServerError,
+			"Internal Server Error",
+			err,
 		)
 		return
 	}
+
+	refreshToken := auth.MakeRefreshToken()
+
+	_, err = cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().UTC().Add(60 * 24 * time.Hour),
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "error adding refresh token", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, User{
+		ID:           user.ID,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		Email:        user.Email,
+		Token:        accessToken,
+		RefreshToken: refreshToken,
+	})
 
 }
 
@@ -166,25 +157,25 @@ func (cfg *apiConfig) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	refreshToken, err := auth.GetBearerToken(r.Header)
 
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "not authorized")
+		respondWithError(w, http.StatusUnauthorized, "not authorized", err)
 		return
 	}
 
 	storedToken, err := cfg.db.GetRefreshToken(r.Context(), refreshToken)
 
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "not matching")
+		respondWithError(w, http.StatusUnauthorized, "not matching", err)
 		return
 	}
 
 	if storedToken.ExpiresAt.Before(time.Now().UTC()) || storedToken.RevokedAt.Valid {
-		respondWithError(w, http.StatusUnauthorized, "not matching")
+		respondWithError(w, http.StatusUnauthorized, "not matching", nil)
 		return
 	}
 
 	accessToken, err := auth.MakeJWT(storedToken.UserID, cfg.jwtSecret, time.Hour)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "error generating new token")
+		respondWithError(w, http.StatusInternalServerError, "error generating new token", err)
 		return
 	}
 
@@ -197,13 +188,13 @@ func (cfg *apiConfig) handleRefresh(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) handleRevoke(w http.ResponseWriter, r *http.Request) {
 	refreshToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "error extracting valid token")
+		respondWithError(w, http.StatusUnauthorized, "error extracting valid token", err)
 		return
 	}
 
 	err = cfg.db.RevokeRefreshToken(r.Context(), refreshToken)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "internal server error")
+		respondWithError(w, http.StatusInternalServerError, "internal server error", err)
 		return
 	}
 
@@ -218,15 +209,9 @@ func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 
-	accessToken, err := auth.GetBearerToken(r.Header)
+	userID, err := auth.UserIDFromRequest(r.Header, cfg.jwtSecret)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Invalid token")
-		return
-	}
-
-	userID, err := auth.ValidateJWT(accessToken, cfg.jwtSecret)
-	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Invalid token")
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
 		return
 	}
 
@@ -234,7 +219,7 @@ func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	req := payload{}
 	err = decoder.Decode(&req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
@@ -245,14 +230,14 @@ func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 			w,
 			http.StatusBadRequest,
 			"Email and password are required",
+			nil,
 		)
 		return
 	}
 
 	hashedPassword, err := auth.HashPassword(req.Password)
 	if err != nil {
-		log.Print(err)
-		respondWithError(w, http.StatusInternalServerError, "Couldnt update user")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password", err)
 		return
 	}
 
@@ -262,7 +247,7 @@ func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		ID:             userID,
 	})
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "error updating the error")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't update user", err)
 		return
 	}
 	respondWithJSON(w, http.StatusOK, User{
