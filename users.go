@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/Sudhanshu069/chirpy/internal/auth"
 	"github.com/Sudhanshu069/chirpy/internal/database"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type User struct {
@@ -18,6 +21,11 @@ type User struct {
 	Email        string    `json:"email"`
 	Token        string    `json:"token,omitempty"`
 	RefreshToken string    `json:"refresh_token,omitempty"`
+}
+
+func isUniqueViolation(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505"
 }
 
 func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +66,10 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		HashedPassword: hashedPassword,
 	})
 	if err != nil {
+		if isUniqueViolation(err) {
+			respondWithError(w, http.StatusConflict, "Email already in use", err)
+			return
+		}
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create user", err)
 		return
 	}
@@ -99,12 +111,11 @@ func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	user, err := cfg.db.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		respondWithError(
-			w,
-			http.StatusUnauthorized,
-			"Incorrect email or password",
-			err,
-		)
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Couldn't look up user", err)
 		return
 	}
 
@@ -243,6 +254,10 @@ func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		ID:             userID,
 	})
 	if err != nil {
+		if isUniqueViolation(err) {
+			respondWithError(w, http.StatusConflict, "Email already in use", err)
+			return
+		}
 		respondWithError(w, http.StatusInternalServerError, "Couldn't update user", err)
 		return
 	}

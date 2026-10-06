@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Sudhanshu069/chirpy/internal/auth"
 	"github.com/Sudhanshu069/chirpy/internal/database"
@@ -58,7 +59,7 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if len(req.Body) > 140 {
+	if utf8.RuneCountInString(req.Body) > 140 {
 		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
 		return
 	}
