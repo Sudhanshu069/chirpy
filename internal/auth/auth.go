@@ -103,3 +103,20 @@ func UserIDFromRequest(headers http.Header, secret string) (uuid.UUID, error) {
 	}
 	return ValidateJWT(accessToken, secret)
 }
+
+func GetAPIKey(headers http.Header) (string, error) {
+	authHeader := headers.Get("Authorization")
+	if authHeader == "" {
+		return "", errors.New("authorization header not found")
+	}
+
+	token, ok := strings.CutPrefix(authHeader, "ApiKey ")
+	if !ok {
+		return "", errors.New("apikey not found")
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", errors.New("empty apikey token")
+	}
+	return token, nil
+}

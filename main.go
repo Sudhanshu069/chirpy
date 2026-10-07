@@ -17,6 +17,7 @@ type apiConfig struct {
 	db             *database.Queries
 	platform       string
 	jwtSecret      string
+	polkaKey       string
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -39,10 +40,15 @@ func main() {
 		db:        database.New(db),
 		platform:  os.Getenv("PLATFORM"),
 		jwtSecret: os.Getenv("JWT_SECRET"),
+		polkaKey:  os.Getenv("POLKA_KEY"),
 	}
 
 	if apiCfg.jwtSecret == "" {
 		log.Fatal("jwt_secret not set")
+	}
+
+	if apiCfg.polkaKey == "" {
+		log.Fatal("polka_key not set")
 	}
 
 	mux := http.NewServeMux()
@@ -63,6 +69,7 @@ func main() {
 	mux.HandleFunc("POST /api/revoke", apiCfg.handleRevoke)
 	mux.HandleFunc("POST /api/users", apiCfg.handleCreateUser)
 	mux.HandleFunc("PUT /api/users", apiCfg.handleUpdateUser)
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.handleUpgradeUserRed)
 
 	s := &http.Server{
 		Addr:    ":8080",

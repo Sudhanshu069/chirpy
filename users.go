@@ -15,12 +15,13 @@ import (
 )
 
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Email        string    `json:"email"`
-	Token        string    `json:"token,omitempty"`
-	RefreshToken string    `json:"refresh_token,omitempty"`
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Email         string    `json:"email"`
+	Token         string    `json:"token,omitempty"`
+	RefreshToken  string    `json:"refresh_token,omitempty"`
+	Is_Chirpy_Red bool      `json:"is_chirpy_red"`
 }
 
 func isUniqueViolation(err error) bool {
@@ -75,10 +76,11 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusCreated, User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+		ID:            user.ID,
+		CreatedAt:     user.CreatedAt,
+		UpdatedAt:     user.UpdatedAt,
+		Email:         user.Email,
+		Is_Chirpy_Red: user.IsChirpyRed,
 	})
 }
 
@@ -150,12 +152,13 @@ func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, User{
-		ID:           user.ID,
-		CreatedAt:    user.CreatedAt,
-		UpdatedAt:    user.UpdatedAt,
-		Email:        user.Email,
-		Token:        accessToken,
-		RefreshToken: refreshToken,
+		ID:            user.ID,
+		CreatedAt:     user.CreatedAt,
+		UpdatedAt:     user.UpdatedAt,
+		Email:         user.Email,
+		Token:         accessToken,
+		RefreshToken:  refreshToken,
+		Is_Chirpy_Red: user.IsChirpyRed,
 	})
 }
 
@@ -262,9 +265,57 @@ func (cfg *apiConfig) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondWithJSON(w, http.StatusOK, User{
-		ID:        updatedUser.ID,
-		CreatedAt: updatedUser.CreatedAt,
-		UpdatedAt: updatedUser.UpdatedAt,
-		Email:     updatedUser.Email,
+		ID:            updatedUser.ID,
+		CreatedAt:     updatedUser.CreatedAt,
+		UpdatedAt:     updatedUser.UpdatedAt,
+		Email:         updatedUser.Email,
+		Is_Chirpy_Red: updatedUser.IsChirpyRed,
 	})
+}
+
+func (cfg *apiConfig) handleUpgradeUserRed(w http.ResponseWriter, r *http.Request) {
+	type payload struct {
+		Event string `json:"event"`
+		Data  struct {
+			UserID uuid.UUID `json:"user_id"`
+		} `json:"data"`
+	}
+
+	val, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Malformed token", err)
+		return
+	}
+
+	if val != cfg.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Not allowed", nil)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	req := payload{}
+
+	err = decoder.Decode(&req)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload", err)
+		return
+	}
+
+	if req.Event != "user.upgraded" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	_, err = cfg.db.UpgradeUserRed(r.Context(), req.Data.UserID)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, "User not found", err)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Couldn't upgrade user", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
